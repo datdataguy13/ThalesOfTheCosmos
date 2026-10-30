@@ -1,0 +1,10 @@
+# dependencies & build output
+node_modules
+dist
+dist-ssr
+
+# local env & editor junk
+*.local
+.env
+.env.local
+.DS_Store
