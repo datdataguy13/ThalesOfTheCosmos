@@ -17,9 +17,22 @@ export function getCurrentLocation(options = {}) {
           : 'Could not get your location.'
         reject(new Error(msg))
       },
-      { enableHighAccuracy: false, timeout: 10000, maximumAge: 600000, ...options },
+      { enableHighAccuracy: true, timeout: 15000, maximumAge: 0, ...options },
     )
   })
+}
+
+// Pick the recognisable town name from BigDataCloud's response. The top-level
+// `city`/`locality` fields are inconsistent between countries (e.g. a US town
+// lands in `locality` while its `city` is an administrative township, but it's
+// the reverse in London). The reliable signal is the administrative hierarchy:
+// the real town is the entry *described* as a city/town, lowest admin level.
+function pickTown(d) {
+  const admin = (d.localityInfo && d.localityInfo.administrative) || []
+  const cityLike = admin.filter((a) => /\b(city|town|village|municipalit)/i.test(a.description || ''))
+  cityLike.sort((a, b) => (a.adminLevel || 99) - (b.adminLevel || 99) || (a.order || 0) - (b.order || 0))
+  if (cityLike.length) return cityLike[0].name
+  return d.locality || d.city || d.principalSubdivision || ''
 }
 
 // Reverse geocode with the free, key-less BigDataCloud endpoint (CORS-enabled).
@@ -29,11 +42,12 @@ export async function placeNameFor(lat, lon) {
     const r = await fetch(url)
     if (!r.ok) throw new Error('bad response')
     const d = await r.json()
-    const place = d.city || d.locality || d.principalSubdivision
-    const country = d.countryName
-    if (place && country) return `${place}, ${country}`
-    if (place) return place
-    if (country) return country
+    const town = pickTown(d)
+    // Add a region for context: the state/province, else the country.
+    const sub = d.principalSubdivision
+    const region = sub && sub !== town ? sub : (d.countryName && d.countryName !== town ? d.countryName : '')
+    const name = [town, region].filter(Boolean).join(', ')
+    if (name) return name
   } catch {
     // fall through to a coordinate label
   }
