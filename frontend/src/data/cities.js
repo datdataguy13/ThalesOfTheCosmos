@@ -8,6 +8,7 @@ export const CITIES = [
   ['Reykjavik, Iceland', 64.15, -21.94],
   ['New York, USA', 40.71, -74.01],
   ['Chicago, USA', 41.88, -87.63],
+  ['Austin, USA', 30.27, -97.74],
   ['Los Angeles, USA', 34.05, -118.24],
   ['Toronto, Canada', 43.65, -79.38],
   ['Honolulu, USA', 21.31, -157.86],
