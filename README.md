@@ -1,5 +1,7 @@
 # 🔭 Thales of the Cosmos
 
+### ▶ Try it live: **https://datdataguy13.github.io/ThalesOfTheCosmos/**
+
 A kid-friendly stargazing guide. Enter where you are and it tells you — from real
 astronomy — what's in the sky tonight: the Moon's phase, which planets are up and
 what a telescope would show, and the constellations with the ancient stories
