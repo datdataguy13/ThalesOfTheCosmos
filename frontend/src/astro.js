@@ -90,27 +90,36 @@ function moonRaDec(T) {
     + 0.173 * Math.sin(2 * D - F)
   const l = lon * DEG, b = lat * DEG
   const v = [Math.cos(b) * Math.cos(l), Math.cos(b) * Math.sin(l), Math.sin(b)]
-  return toRaDec(eclToEq(v))
+  return { ...toRaDec(eclToEq(v)), eclLon: n360(lon) }
 }
 
 const SYN = 29.530588853
-const NEW0 = 2451550.1 // a known new moon (2000-01-06 18:14 UT)
 
-export function moonPhase(JD) {
-  const age = ((JD - NEW0) % SYN + SYN) % SYN
-  const frac = age / SYN
-  const illum = (1 - Math.cos(2 * Math.PI * frac)) / 2
-  const waxing = frac < 0.5
-  const toNextNew = ((1 - frac) % 1) * SYN
-  const toNextFull = (((0.5 - frac) % 1 + 1) % 1) * SYN
+// Phase from the Moon's TRUE position relative to the Sun, not a uniform clock.
+// `elong` is the geocentric ecliptic longitude of the Moon minus the Sun's,
+// measured 0..360: 0 = new, 90 = first quarter, 180 = full, 270 = last quarter.
+// This tracks the real (non-uniform) lunar motion, so the phase matches almanacs;
+// a mean "days since new moon" clock can run up to ~a day off.
+export function moonPhase(moonEclLon, sunEclLon) {
+  const elong = n360(moonEclLon - sunEclLon)
+  const frac = elong / 360
+  const illum = (1 - Math.cos(elong * DEG)) / 2
+  const waxing = elong < 180
+  const age = frac * SYN                 // days since new moon (from true elongation)
+  const perDeg = SYN / 360               // mean days the Moon takes per degree of elongation
+  const toNextNew = n360(360 - elong) * perDeg
+  const toNextFull = n360(180 - elong) * perDeg
+  // Naming: New/Full cover their whole day (the eye can't tell ~99% from 100%, so
+  // ±12° ≈ the almanac's day marker). The quarters stay tight to the true geometry,
+  // because a fat crescent really is visibly different from a half-lit quarter.
   let name
-  if (frac < 0.03 || frac > 0.97) name = 'New Moon'
-  else if (frac < 0.22) name = 'Waxing Crescent'
-  else if (frac < 0.28) name = 'First Quarter'
-  else if (frac < 0.47) name = 'Waxing Gibbous'
-  else if (frac < 0.53) name = 'Full Moon'
-  else if (frac < 0.72) name = 'Waning Gibbous'
-  else if (frac < 0.78) name = 'Last Quarter'
+  if (elong < 12 || elong > 348) name = 'New Moon'
+  else if (elong < 87) name = 'Waxing Crescent'
+  else if (elong < 93) name = 'First Quarter'
+  else if (elong < 168) name = 'Waxing Gibbous'
+  else if (elong < 192) name = 'Full Moon'
+  else if (elong < 267) name = 'Waning Gibbous'
+  else if (elong < 273) name = 'Last Quarter'
   else name = 'Waning Crescent'
   return { age, frac, illum, waxing, name, toNextNew, toNextFull }
 }
@@ -144,7 +153,8 @@ export function computeSky(dateObj, hourLocal, lat, lon) {
 
   const mrd = moonRaDec(T)
   const maa = altaz(mrd.ra, mrd.dec, lst, lat)
-  const phase = moonPhase(JD)
+  const sunEclLon = n360(Math.atan2(sunGeo[1], sunGeo[0]) * RAD)
+  const phase = moonPhase(mrd.eclLon, sunEclLon)
 
   return {
     JD, lst, lat, lon, tz, dark,
