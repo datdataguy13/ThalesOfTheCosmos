@@ -12,7 +12,6 @@ So there is nothing to run here right now.
 
 You'd want a small server in this folder if you later decide to:
 
-- **Use real Claude AI for "Ask the sky".** An API key must never live in browser code, so you'd add a tiny proxy here (e.g. an Express route) that holds the key in an environment variable and forwards questions to the Anthropic API.
 - **Cache or rate-limit** weather/geocoding requests.
 - **Add accounts or saved favourites.**
 

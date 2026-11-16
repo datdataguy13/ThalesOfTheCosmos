@@ -50,5 +50,4 @@ npm run preview    # preview the production build
   `localhost` during development, or an `https://` URL when you deploy.
 - The star patterns are drawn to be recognisable, not to exact scale.
 
-See [`backend/README.md`](backend/README.md) for when you'd add a server (e.g. to
-power "Ask the sky" with real Claude AI).
+See [`backend/README.md`](backend/README.md) for when you'd add a server.
