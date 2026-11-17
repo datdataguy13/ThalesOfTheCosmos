@@ -268,6 +268,38 @@ section { margin-top:40px; }
 .factbox .k { font-family:var(--ff-mono); font-size:.7rem; letter-spacing:.1em; text-transform:uppercase; color:var(--gold); font-weight:500; }
 .factbox p { margin:4px 0 0; color:var(--muted); }
 
+/* ---------- Sky dome ---------- */
+.dome { overflow:hidden; display:flex; flex-direction:column; }
+.dome-bar { display:flex; justify-content:space-between; align-items:center; gap:10px; flex-wrap:wrap; padding:12px 14px; }
+.dome-goto, .dbtn {
+  background:var(--surface-2); border:1px solid var(--line); color:var(--fg); border-radius:999px;
+  font-family:var(--ff-body); font-weight:700; font-size:.88rem; cursor:pointer;
+}
+.dome-goto { padding:9px 12px; max-width:100%; }
+.dome-tools { display:flex; gap:8px; flex-wrap:wrap; }
+.dbtn { min-width:38px; height:38px; padding:0 10px; font-size:1.05rem; line-height:1; }
+.dbtn.wide { padding:0 14px; font-size:.86rem; }
+.dbtn:hover, .dome-goto:hover { border-color:var(--gold); }
+.dbtn.on { background:var(--gold); border-color:var(--gold); color:#1a1405; }
+.dome-stage { position:relative; height:min(64vh,560px); min-height:320px; background:var(--sky-0); }
+.dome-stage canvas { position:absolute; inset:0; width:100%; height:100%; display:block; touch-action:none; cursor:grab; outline:none; }
+.dome-stage canvas:active { cursor:grabbing; }
+.dome-stage canvas:focus-visible { box-shadow:inset 0 0 0 2px var(--gold); }
+.dome-flag {
+  position:absolute; left:12px; right:12px; top:12px; margin:auto; width:fit-content; max-width:calc(100% - 24px);
+  background:rgba(10,15,40,.8); color:#fff; border:1px solid rgba(255,255,255,.2); border-radius:12px;
+  padding:8px 12px; font-size:.84rem; pointer-events:none;
+}
+.dome-foot { padding:12px 16px 14px; }
+.dome-caption { margin:0; font-weight:700; }
+.dome-help { margin:3px 0 0; color:var(--faint); font-size:.82rem; }
+/* full screen: the dome covers the page (the story pop-up still opens above it) */
+.dome.expanded {
+  position:fixed; inset:0; z-index:40; border-radius:0; border:0;
+  padding-top:env(safe-area-inset-top,0px); padding-bottom:env(safe-area-inset-bottom,0px);
+}
+.dome.expanded .dome-stage { flex:1; height:auto; min-height:0; }
+
 /* ---------- Shared bits for the newer sections ---------- */
 .pad { padding:20px; }
 .sr { position:absolute; width:1px; height:1px; overflow:hidden; clip-path:inset(50%); white-space:nowrap; }

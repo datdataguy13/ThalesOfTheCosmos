@@ -1,4 +1,4 @@
-import { useState, useMemo, useEffect, useRef, useCallback } from 'react'
+import { useState, useMemo, useEffect, useRef, useCallback, lazy, Suspense } from 'react'
 import { computeSky, altOf, roughTzHours } from './astro.js'
 import { CITIES } from './data/cities.js'
 import { PLANETS } from './data/planets.js'
@@ -19,6 +19,9 @@ import StargazerLog from './components/StargazerLog.jsx'
 import { useStargazerLog } from './lib/useStargazerLog.js'
 import { load, save } from './lib/storage.js'
 import { toISO, fromISO, tzOffsetHours } from './lib/time.js'
+
+// The sky dome brings a star catalogue with it, so it loads as its own piece.
+const SkyDome = lazy(() => import('./components/SkyDome.jsx'))
 
 const SKY_META = {
   clear: { label: 'Crystal clear', ico: '✨', stars: 'thousands of' },
@@ -270,10 +273,25 @@ export default function App() {
       </header>
 
       <main className="wrap">
-        {/* MOON */}
+        {/* SKY DOME */}
         <section>
           <div className="sechead">
             <span className="eyebrow">Step 1</span>
+            <h2>Look up</h2>
+            <p>The real sky over {place.name} at {hourLabel} — every star where you'll find it.</p>
+          </div>
+          <Suspense fallback={<div className="panel pad light">Unrolling the star map…</div>}>
+            <SkyDome
+              sky={sky} condition={condition} planets={PLANETS} stories={CONSTELLATIONS} southern={southern}
+              placeName={place.name} hourLabel={hourLabel} onStory={setOpen}
+            />
+          </Suspense>
+        </section>
+
+        {/* MOON */}
+        <section>
+          <div className="sechead">
+            <span className="eyebrow">Step 2</span>
             <h2>The Moon tonight</h2>
             <p>The Moon changes shape a little every night — here's exactly how it looks{southern ? ' from the southern hemisphere' : ''}.</p>
           </div>
@@ -319,7 +337,7 @@ export default function App() {
         {/* BEST NIGHT THIS WEEK */}
         <section>
           <div className="sechead">
-            <span className="eyebrow">Step 2</span>
+            <span className="eyebrow">Step 3</span>
             <h2>Best night this week</h2>
             <p>The cloud forecast and the Moon, night by night, for {place.name}.</p>
           </div>
@@ -333,7 +351,7 @@ export default function App() {
         {/* COMING UP */}
         <section>
           <div className="sechead">
-            <span className="eyebrow">Step 3</span>
+            <span className="eyebrow">Step 4</span>
             <h2>Coming up in the sky</h2>
             <p>Things worth staying up for.</p>
           </div>
@@ -343,7 +361,7 @@ export default function App() {
         {/* ASK THE SKY */}
         <section>
           <div className="sechead">
-            <span className="eyebrow">Step 4</span>
+            <span className="eyebrow">Step 5</span>
             <h2>Ask the sky</h2>
             <p>Let the kids type their own space questions and get friendly answers.</p>
           </div>
@@ -353,7 +371,7 @@ export default function App() {
         {/* PLANETS */}
         <section>
           <div className="sechead">
-            <span className="eyebrow">Step 5</span>
+            <span className="eyebrow">Step 6</span>
             <h2>Planets through the telescope</h2>
             <p>Which planets are above the horizon from {place.name} at {hourLabel}, and what you'd see.</p>
           </div>
@@ -385,7 +403,7 @@ export default function App() {
         {/* CONSTELLATIONS */}
         <section>
           <div className="sechead">
-            <span className="eyebrow">Step 6</span>
+            <span className="eyebrow">Step 7</span>
             <h2>Constellations &amp; their stories</h2>
             <p>Tap any card to see how to find it, hear the ancient story, and check if it's up tonight.</p>
           </div>
@@ -412,7 +430,7 @@ export default function App() {
         {/* DRAWING GAME */}
         <section>
           <div className="sechead">
-            <span className="eyebrow">Step 7</span>
+            <span className="eyebrow">Step 8</span>
             <h2>Connect the stars</h2>
             <p>Can you draw each constellation from memory? Join the stars to find out.</p>
           </div>
@@ -425,7 +443,7 @@ export default function App() {
         {/* STARGAZER LOG */}
         <section>
           <div className="sechead">
-            <span className="eyebrow">Step 8</span>
+            <span className="eyebrow">Step 9</span>
             <h2>My stargazer badges</h2>
             <p>Tick off what you've really seen outside and collect them all.</p>
           </div>
@@ -433,7 +451,7 @@ export default function App() {
         </section>
 
         <footer>
-          <p><b>Thales of the Cosmos</b> is a learning tool. The Moon phase and planet positions are calculated from real astronomy for the night you pick, using your location and live weather; the star patterns are drawn to help you recognise each shape, not to exact scale.</p>
+          <p><b>Thales of the Cosmos</b> is a learning tool. The Moon phase and planet positions are calculated from real astronomy for the night you pick, using your location and live weather; the sky dome uses real star positions, while the constellation cards are drawn to help you recognise each shape, not to exact scale.</p>
           <p className="note">Named after Thales of Miletus, one of the first people to study the stars with reason instead of myth — around 2,600 years ago.</p>
         </footer>
       </main>

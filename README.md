@@ -12,6 +12,9 @@ reason instead of myth, around 2,600 years ago.
 
 ## What it does
 
+- 🔭 **Sky dome** — tonight's real sky, every star in its true place. Drag with a
+  cursor or finger to look around; on a phone, "Point at the sky" makes the view
+  follow the phone like a window. Tap a gold constellation name for its story.
 - 🌙 **Moon phase** — drawn accurately for any date, with illumination, age, and
   the next full/new moon. Flips automatically for the southern hemisphere.
 - 🪐 **Planets tonight** — real positions from orbital elements tell you which of
@@ -61,5 +64,12 @@ npm run preview    # preview the production build
 - Geolocation and the Web Speech API (read-aloud) require a **secure context** —
   `localhost` during development, or an `https://` URL when you deploy.
 - The star patterns are drawn to be recognisable, not to exact scale.
+
+## Credits
+
+Star positions and constellation lines in the sky dome are derived from the
+[d3-celestial](https://github.com/ofrohn/d3-celestial) data files (Hipparcos
+catalogue), Copyright (c) 2015 Olaf Frohn, BSD 3-Clause licence. To regenerate
+`frontend/src/data/sky.json`, run `node scripts/build-sky-data.mjs` in `frontend/`.
 
 See [`backend/README.md`](backend/README.md) for when you'd add a server.
