@@ -3,7 +3,7 @@ import ConstellationCanvas from './ConstellationCanvas.jsx'
 import { altOf } from '../astro.js'
 import { useSpeech } from '../lib/useSpeech.js'
 
-export default function ConstellationModal({ c, sky, cityName, hourLabel, onClose }) {
+export default function ConstellationModal({ c, sky, cityName, hourLabel, found, onToggleFound, onClose }) {
   const { supported, speaking, speak, stop } = useSpeech()
 
   useEffect(() => {
@@ -48,6 +48,11 @@ export default function ConstellationModal({ c, sky, cityName, hourLabel, onClos
             <span className="chip">Height now: <b>{Math.round(alt)}°</b></span>
             <span className="chip">From <b>{cityName}</b> at {hourLabel}</span>
           </div>
+          {onToggleFound && (
+            <button className={'tick foundbtn' + (found ? ' on' : '')} onClick={onToggleFound} aria-pressed={!!found}>
+              <span className="box" aria-hidden="true">{found ? '✓' : ''}</span>{found ? 'In my stargazer log' : 'I found it in the sky!'}
+            </button>
+          )}
           <div className="factbox">
             <div className="k">How to find it</div>
             <p className="light">{c.find}</p>

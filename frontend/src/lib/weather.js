@@ -1,6 +1,7 @@
 // weather.js — live sky conditions from Open-Meteo (free, no API key needed).
 // We translate the forecast into a simple stargazing condition the rest of the
-// app already understands: 'clear' | 'some' | 'cloudy'.
+// app already understands: 'clear' | 'some' | 'cloudy'. The same request also
+// brings back the week's cloud forecast and the place's time zone.
 
 const WMO = {
   0: 'Clear sky', 1: 'Mostly clear', 2: 'Partly cloudy', 3: 'Overcast',
@@ -22,9 +23,29 @@ function conditionFrom(cloudCover, code) {
   return 'clear'
 }
 
+// Evening cloud cover for each forecast night: the average over 8pm–midnight,
+// which is when a family is most likely to be outside looking up.
+function nightsFrom(hourly) {
+  if (!hourly || !Array.isArray(hourly.time) || !Array.isArray(hourly.cloud_cover)) return []
+  const byDate = new Map()
+  hourly.time.forEach((stamp, i) => {
+    const cover = hourly.cloud_cover[i]
+    const hour = +stamp.slice(11, 13)
+    if (typeof cover !== 'number' || hour < 20) return
+    const date = stamp.slice(0, 10)
+    if (!byDate.has(date)) byDate.set(date, [])
+    byDate.get(date).push(cover)
+  })
+  return [...byDate].map(([date, covers]) => ({
+    date,
+    cloud: Math.round(covers.reduce((a, b) => a + b, 0) / covers.length),
+  }))
+}
+
 export async function getWeather(lat, lon) {
   const url = `https://api.open-meteo.com/v1/forecast?latitude=${lat}&longitude=${lon}`
-    + `&current=temperature_2m,cloud_cover,weather_code,is_day&timezone=auto`
+    + `&current=temperature_2m,cloud_cover,weather_code,is_day`
+    + `&hourly=cloud_cover&forecast_days=7&timezone=auto`
   const r = await fetch(url)
   if (!r.ok) throw new Error('Weather service is unavailable right now.')
   const d = await r.json()
@@ -38,5 +59,7 @@ export async function getWeather(lat, lon) {
     description: WMO[code] || 'Mixed skies',
     isDay: c.is_day === 1,
     condition: conditionFrom(cloudCover, code),
+    timezone: typeof d.timezone === 'string' ? d.timezone : null,
+    nights: nightsFrom(d.hourly),
   }
 }

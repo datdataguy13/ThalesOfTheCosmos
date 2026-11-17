@@ -121,13 +121,64 @@ export function moonPhase(moonEclLon, sunEclLon) {
   else if (elong < 267) name = 'Waning Gibbous'
   else if (elong < 273) name = 'Last Quarter'
   else name = 'Waning Crescent'
-  return { age, frac, illum, waxing, name, toNextNew, toNextFull }
+  return { elong, age, frac, illum, waxing, name, toNextNew, toNextFull }
 }
+
+const centuries = (ms) => (jdFromMs(ms) - 2451545) / 36525
+
+// The Sun's geocentric position as an ecliptic vector (AU) for an instant.
+function sunGeoAt(T) {
+  const earth = helio('Earth', T)
+  return [-earth[0], -earth[1], -earth[2]]
+}
+
+// The Sun's RA/Dec (degrees) at an instant given in epoch milliseconds.
+export function sunAt(ms) {
+  return toRaDec(eclToEq(sunGeoAt(centuries(ms))))
+}
+
+// How high the Sun is (degrees) for an observer; below -6 means properly dark.
+export function sunAltitude(ms, lat, lon) {
+  const sun = sunAt(ms)
+  return altaz(sun.ra, sun.dec, n360(gmst(jdFromMs(ms)) + lon), lat).alt
+}
+
+// The Moon's phase at an instant (the same everywhere on Earth).
+export function moonPhaseAt(ms) {
+  const T = centuries(ms)
+  const sunGeo = sunGeoAt(T)
+  return moonPhase(moonRaDec(T).eclLon, n360(Math.atan2(sunGeo[1], sunGeo[0]) * RAD))
+}
+
+// When the Moon next reaches a given elongation (0 new, 90 first quarter,
+// 180 full, 270 last quarter) after `fromMs`. Returns epoch milliseconds.
+export function nextMoonPhase(fromMs, targetElong) {
+  const HOUR = 3600000
+  // signed distance still to travel to the target, in (-180, 180]
+  const gap = (ms) => { const g = n360(targetElong - moonPhaseAt(ms).elong); return g > 180 ? g - 360 : g }
+  let t = fromMs
+  // step forward an hour at a time until the target falls inside the next hour
+  for (let i = 0; i < 24 * 31; i++) {
+    if (gap(t) > 0 && gap(t + HOUR) <= 0) break
+    t += HOUR
+  }
+  let lo = t, hi = t + HOUR
+  for (let i = 0; i < 12; i++) {
+    const mid = (lo + hi) / 2
+    if (gap(mid) > 0) lo = mid; else hi = mid
+  }
+  return (lo + hi) / 2
+}
+
+// The civil-time offset we assume when the real time zone isn't known:
+// 15 degrees of longitude per hour.
+export const roughTzHours = (lon) => Math.round(lon / 15)
 
 // Full sky snapshot for a place and civil instant.
 // dateObj: local Date (y/m/d used); hourLocal: 0-23; lat/lon in degrees (east +).
-export function computeSky(dateObj, hourLocal, lat, lon) {
-  const tz = Math.round(lon / 15)
+// tzHours: the place's UTC offset in hours, when known (else guessed from longitude).
+export function computeSky(dateObj, hourLocal, lat, lon, tzHours) {
+  const tz = typeof tzHours === 'number' ? tzHours : roughTzHours(lon)
   const ms = Date.UTC(dateObj.getFullYear(), dateObj.getMonth(), dateObj.getDate(), 0, 0, 0)
     + (hourLocal - tz) * 3600 * 1000
   const JD = jdFromMs(ms)
@@ -148,7 +199,7 @@ export function computeSky(dateObj, hourLocal, lat, lon) {
     const dot = (geo[0] * sunGeo[0] + geo[1] * sunGeo[1] + geo[2] * sunGeo[2])
       / (Math.hypot(...geo) * Math.hypot(...sunGeo))
     const elong = Math.acos(clamp(dot, -1, 1)) * RAD
-    planets[p] = { alt: aa.alt, az: aa.az, dir: dirOf(aa.az), elong, dist: Math.hypot(...geo) }
+    planets[p] = { ra: rd.ra, dec: rd.dec, alt: aa.alt, az: aa.az, dir: dirOf(aa.az), elong, dist: Math.hypot(...geo) }
   }
 
   const mrd = moonRaDec(T)
@@ -157,10 +208,10 @@ export function computeSky(dateObj, hourLocal, lat, lon) {
   const phase = moonPhase(mrd.eclLon, sunEclLon)
 
   return {
-    JD, lst, lat, lon, tz, dark,
+    ms, JD, lst, lat, lon, tz, dark,
     sun: { ...sun, ...sunAA },
     planets,
-    moon: { ...phase, alt: maa.alt, az: maa.az, dir: dirOf(maa.az) },
+    moon: { ...phase, ra: mrd.ra, dec: mrd.dec, alt: maa.alt, az: maa.az, dir: dirOf(maa.az) },
   }
 }
 

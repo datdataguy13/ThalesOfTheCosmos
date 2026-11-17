@@ -1,5 +1,5 @@
-import { useState, useMemo, useEffect, useRef } from 'react'
-import { computeSky, altOf } from './astro.js'
+import { useState, useMemo, useEffect, useRef, useCallback } from 'react'
+import { computeSky, altOf, roughTzHours } from './astro.js'
 import { CITIES } from './data/cities.js'
 import { PLANETS } from './data/planets.js'
 import { CONSTELLATIONS } from './data/constellations.js'
@@ -11,6 +11,14 @@ import PlanetIcon from './components/PlanetIcon.jsx'
 import ConstellationCanvas from './components/ConstellationCanvas.jsx'
 import ConstellationModal from './components/ConstellationModal.jsx'
 import AskSky from './components/AskSky.jsx'
+import MoonCalendar from './components/MoonCalendar.jsx'
+import BestNights from './components/BestNights.jsx'
+import SkyEvents from './components/SkyEvents.jsx'
+import ConstellationGame from './components/ConstellationGame.jsx'
+import StargazerLog from './components/StargazerLog.jsx'
+import { useStargazerLog } from './lib/useStargazerLog.js'
+import { load, save } from './lib/storage.js'
+import { toISO, fromISO, tzOffsetHours } from './lib/time.js'
 
 const SKY_META = {
   clear: { label: 'Crystal clear', ico: '✨', stars: 'thousands of' },
@@ -20,15 +28,24 @@ const SKY_META = {
 }
 const PHASE_NAMES = ['New Moon', 'Waxing Crescent', 'First Quarter', 'Waxing Gibbous', 'Full Moon', 'Waning Gibbous', 'Last Quarter', 'Waning Crescent']
 
-const toISO = (d) => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`
+const DEFAULT_PLACE = { name: CITIES[0][0], lat: CITIES[0][1], lon: CITIES[0][2], source: 'default' }
+// The last place used is remembered on this device, so the app opens ready to
+// go — even in the garden with no signal.
+function rememberedPlace() {
+  const p = load('cosmos.place', null)
+  return p && typeof p.lat === 'number' && typeof p.lon === 'number' && typeof p.name === 'string' ? p : DEFAULT_PLACE
+}
 const fmtDays = (n) => { const d = Math.round(n); return d <= 0 ? 'today' : d === 1 ? '1 day' : d + ' days' }
 const hourText = (h) => `${((h + 11) % 12) + 1} ${h < 12 ? 'AM' : 'PM'}`
 
 export default function App() {
   const now = new Date()
   const [theme, setTheme] = useState('auto')
-  const [place, setPlace] = useState({ name: CITIES[0][0], lat: CITIES[0][1], lon: CITIES[0][2], source: 'default' })
-  const [dateStr, setDateStr] = useState(toISO(now))
+  const [redLight, setRedLight] = useState(() => load('cosmos.red', false) === true)
+  const [place, setPlace] = useState(rememberedPlace)
+  const todayStr = toISO(now)
+  const today = useMemo(() => fromISO(todayStr), [todayStr])
+  const [dateStr, setDateStr] = useState(todayStr)
   const [hour, setHour] = useState(21)
   const [override, setOverride] = useState(null) // manual sky-condition override
 
@@ -40,17 +57,28 @@ export default function App() {
   const [query, setQuery] = useState('')
   const [results, setResults] = useState([])
   const [open, setOpen] = useState(null)
+  const log = useStargazerLog()
+  const closeModal = useCallback(() => setOpen(null), [])
 
-  // theme attribute
+  // Theme attribute. Red night-vision mode always sits on top of the dark
+  // theme: the red veil only works over dark colours.
   useEffect(() => {
-    if (theme === 'auto') document.documentElement.removeAttribute('data-theme')
-    else document.documentElement.setAttribute('data-theme', theme)
-  }, [theme])
+    const root = document.documentElement
+    if (redLight) root.setAttribute('data-theme', 'dark')
+    else if (theme === 'auto') root.removeAttribute('data-theme')
+    else root.setAttribute('data-theme', theme)
+    if (redLight) root.setAttribute('data-night', 'red')
+    else root.removeAttribute('data-night')
+    save('cosmos.red', redLight)
+  }, [theme, redLight])
+
+  useEffect(() => { save('cosmos.place', place) }, [place])
 
   // fetch live weather whenever the place changes
   useEffect(() => {
     let cancelled = false
     setWeatherState('loading')
+    setWeather(null) // the old place's forecast and time zone no longer apply
     setOverride(null)
     getWeather(place.lat, place.lon)
       .then((w) => { if (!cancelled) { setWeather(w); setWeatherState('ok') } })
@@ -81,8 +109,21 @@ export default function App() {
     }
   }
 
-  const dateObj = useMemo(() => { const [y, m, d] = dateStr.split('-').map(Number); return new Date(y, m - 1, d) }, [dateStr])
-  const sky = useMemo(() => computeSky(dateObj, hour, place.lat, place.lon), [dateObj, hour, place.lat, place.lon])
+  const dateObj = useMemo(() => fromISO(dateStr), [dateStr])
+
+  // The clock of the place being viewed. The weather service tells us its real
+  // time zone (so daylight-saving time is right); until then, or offline, we
+  // estimate from longitude.
+  const tzName = weather ? weather.timezone : null
+  const tzHours = useMemo(() => {
+    const noon = Date.UTC(dateObj.getFullYear(), dateObj.getMonth(), dateObj.getDate(), 12)
+    const real = tzName ? tzOffsetHours(tzName, noon) : null
+    return typeof real === 'number' ? real : roughTzHours(place.lon)
+  }, [tzName, dateObj, place.lon])
+  const zone = useMemo(() => ({ name: tzName, hours: tzHours }), [tzName, tzHours])
+
+  const sky = useMemo(() => computeSky(dateObj, hour, place.lat, place.lon, tzHours), [dateObj, hour, place.lat, place.lon, tzHours])
+  const drawn = useMemo(() => new Set(Object.keys(log.found).filter((id) => id.startsWith('drawn:')).map((id) => id.slice(6))), [log.found])
 
   const condition = override || (weather && weather.condition) || 'clear'
   const meta = SKY_META[condition]
@@ -140,9 +181,19 @@ export default function App() {
                 <div className="sub">What's in the sky tonight — a stargazing guide for curious kids</div>
               </div>
             </div>
-            <button className="themebtn" onClick={() => setTheme((t) => (t === 'light' ? 'auto' : t === 'auto' ? 'dark' : 'light'))}>
-              {theme === 'light' ? '☀️ Day' : theme === 'dark' ? '🌙 Night' : '🌓 Auto'}
-            </button>
+            <div className="topbtns">
+              <button
+                className={'themebtn' + (redLight ? ' active' : '')} onClick={() => setRedLight((r) => !r)}
+                aria-pressed={redLight} title="Turns the whole screen red so it doesn't spoil your night vision outside"
+              >
+                🔴 Night vision{redLight ? ' on' : ''}
+              </button>
+              {!redLight && (
+                <button className="themebtn" onClick={() => setTheme((t) => (t === 'light' ? 'auto' : t === 'auto' ? 'dark' : 'light'))}>
+                  {theme === 'light' ? '☀️ Day' : theme === 'dark' ? '🌙 Night' : '🌓 Auto'}
+                </button>
+              )}
+            </div>
           </div>
 
           {/* location row */}
@@ -261,13 +312,38 @@ export default function App() {
                 )
               })}
             </div>
+            <MoonCalendar dateStr={dateStr} todayStr={todayStr} onPick={setDateStr} southern={southern} tzHours={tzHours} />
           </div>
+        </section>
+
+        {/* BEST NIGHT THIS WEEK */}
+        <section>
+          <div className="sechead">
+            <span className="eyebrow">Step 2</span>
+            <h2>Best night this week</h2>
+            <p>The cloud forecast and the Moon, night by night, for {place.name}.</p>
+          </div>
+          <BestNights
+            nights={weather ? weather.nights : []} status={weatherState}
+            lat={place.lat} lon={place.lon} tzHours={tzHours} southern={southern}
+            todayStr={todayStr} dateStr={dateStr} onPick={setDateStr}
+          />
+        </section>
+
+        {/* COMING UP */}
+        <section>
+          <div className="sechead">
+            <span className="eyebrow">Step 3</span>
+            <h2>Coming up in the sky</h2>
+            <p>Things worth staying up for.</p>
+          </div>
+          <SkyEvents lat={place.lat} lon={place.lon} zone={zone} tzHours={tzHours} today={today} />
         </section>
 
         {/* ASK THE SKY */}
         <section>
           <div className="sechead">
-            <span className="eyebrow">Step 2</span>
+            <span className="eyebrow">Step 4</span>
             <h2>Ask the sky</h2>
             <p>Let the kids type their own space questions and get friendly answers.</p>
           </div>
@@ -277,7 +353,7 @@ export default function App() {
         {/* PLANETS */}
         <section>
           <div className="sechead">
-            <span className="eyebrow">Step 3</span>
+            <span className="eyebrow">Step 5</span>
             <h2>Planets through the telescope</h2>
             <p>Which planets are above the horizon from {place.name} at {hourLabel}, and what you'd see.</p>
           </div>
@@ -309,7 +385,7 @@ export default function App() {
         {/* CONSTELLATIONS */}
         <section>
           <div className="sechead">
-            <span className="eyebrow">Step 4</span>
+            <span className="eyebrow">Step 6</span>
             <h2>Constellations &amp; their stories</h2>
             <p>Tap any card to see how to find it, hear the ancient story, and check if it's up tonight.</p>
           </div>
@@ -333,6 +409,29 @@ export default function App() {
           </div>
         </section>
 
+        {/* DRAWING GAME */}
+        <section>
+          <div className="sechead">
+            <span className="eyebrow">Step 7</span>
+            <h2>Connect the stars</h2>
+            <p>Can you draw each constellation from memory? Join the stars to find out.</p>
+          </div>
+          <ConstellationGame
+            constellations={CONSTELLATIONS} drawn={drawn}
+            onSolved={(name) => log.mark('drawn:' + name)} onStory={setOpen}
+          />
+        </section>
+
+        {/* STARGAZER LOG */}
+        <section>
+          <div className="sechead">
+            <span className="eyebrow">Step 8</span>
+            <h2>My stargazer badges</h2>
+            <p>Tick off what you've really seen outside and collect them all.</p>
+          </div>
+          <StargazerLog found={log.found} toggle={log.toggle} badges={log.badges} planets={PLANETS} constellations={CONSTELLATIONS} />
+        </section>
+
         <footer>
           <p><b>Thales of the Cosmos</b> is a learning tool. The Moon phase and planet positions are calculated from real astronomy for the night you pick, using your location and live weather; the star patterns are drawn to help you recognise each shape, not to exact scale.</p>
           <p className="note">Named after Thales of Miletus, one of the first people to study the stars with reason instead of myth — around 2,600 years ago.</p>
@@ -342,9 +441,12 @@ export default function App() {
       {open != null && (
         <ConstellationModal
           c={CONSTELLATIONS[open]} sky={sky} cityName={place.name} hourLabel={hourLabel}
-          onClose={() => setOpen(null)}
+          found={!!log.found['con:' + CONSTELLATIONS[open].name]}
+          onToggleFound={() => log.toggle('con:' + CONSTELLATIONS[open].name)}
+          onClose={closeModal}
         />
       )}
+      {redLight && <div className="redveil" aria-hidden="true" />}
     </>
   )
 }
