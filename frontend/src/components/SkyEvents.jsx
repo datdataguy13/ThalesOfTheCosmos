@@ -1,5 +1,5 @@
 import { useState, useEffect, useMemo } from 'react'
-import { upcomingEvents } from '../lib/events.js'
+import { upcomingEvents, highlights } from '../lib/events.js'
 import { fmtTime, fmtDay } from '../lib/time.js'
 
 const awayText = (n) => (n === 0 ? 'Today' : n === 1 ? 'Tomorrow' : n < 60 ? `In ${n} days` : `In ${Math.round(n / 30)} months`)
@@ -56,7 +56,7 @@ function IssPasses({ lat, lon, zone }) {
 }
 
 export default function SkyEvents({ lat, lon, zone, tzHours, today }) {
-  const events = useMemo(() => upcomingEvents(today, lat, lon, tzHours).slice(0, 8), [today, lat, lon, tzHours])
+  const events = useMemo(() => highlights(upcomingEvents(today, lat, lon, tzHours)), [today, lat, lon, tzHours])
   return (
     <div className="evgrid">
       <IssPasses lat={lat} lon={lon} zone={zone} />

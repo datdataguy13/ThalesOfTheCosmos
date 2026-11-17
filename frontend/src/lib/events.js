@@ -96,7 +96,7 @@ function moonEvents(today, tzHours) {
       text: `The whole face of the Moon is lit. People long ago gave every month's full Moon its own name — this one is the ${FULL_MOON_NAMES[full.getMonth()]} Moon. Watch it rise in the east around sunset.`,
     },
     {
-      date: dark, ico: '🌑', kind: 'moon',
+      date: dark, ico: '🌑', kind: 'dark',
       title: 'New Moon — the darkest nights',
       text: 'The Moon is hidden near the Sun, so the sky is at its darkest. The nights around this date are the best time to see faint stars and the Milky Way.',
     },
@@ -140,4 +140,19 @@ export function upcomingEvents(today, lat, lon, tzHours) {
     .map((e) => ({ ...e, daysAway: Math.round((e.date - today) / DAY) }))
     .filter((e) => e.daysAway >= 0)
     .sort((a, b) => a.date - b.date)
+}
+
+// A short, varied list of highlights: the soonest few events, but no more
+// than a couple of any one kind so meteor showers don't crowd everything out.
+const MOST_PER_KIND = { meteors: 2, meetup: 1, moon: 1, eclipse: 1, dark: 0 }
+
+export function highlights(events, max = 5) {
+  const used = {}
+  const out = []
+  for (const e of events) {
+    used[e.kind] = (used[e.kind] || 0) + 1
+    if (used[e.kind] <= MOST_PER_KIND[e.kind]) out.push(e)
+    if (out.length === max) break
+  }
+  return out
 }
